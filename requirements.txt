@@ -1,7 +1,30 @@
+# Core AI and MCP framework
 agno
-# ollama # No longer needed
 pydantic
 mcp
-# google-generativeai # Removed for clarity, error pointed to google-genai
-google-genai # Needed based on working example and ImportError
-python-dotenv # For loading .env file
+google-genai
+python-dotenv
+
+# Cloud storage integrations
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+onedrivesdk
+dropbox
+
+# File analysis and utilities
+pillow  # Image analysis
+python-magic  # File type detection
+pandas  # Data organization
+openpyxl  # Excel file handling
+PyPDF2  # PDF content analysis
+python-docx  # Word document analysis
+mutagen  # Audio metadata
+exifread  # Photo metadata
+
+# Enhanced features
+requests
+aiofiles
+tqdm  # Progress bars
+colorama  # Colored output
+rich  # Beautiful terminal output
