@@ -131,3 +131,12 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Google Drive API Credentials (sensitive)
+google_drive_credentials.json
+google_drive_token.json
+
+# Temporary debug/fix scripts
+debug_*.py
+fix_*.py
+move_*.py
+
