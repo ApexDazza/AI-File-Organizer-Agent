@@ -57,7 +57,8 @@ class UltimateFileOrganizer:
             'organization_style': os.getenv("ORGANIZATION_STYLE", "professional"),
             'auto_backup': os.getenv("AUTO_BACKUP_BEFORE_ORGANIZE", "True").lower() in ('true', '1', 't'),
             'max_files_per_batch': int(os.getenv("MAX_FILES_PER_BATCH", "100")),
-            'google_api_key': os.getenv("GOOGLE_API_KEY")
+            'google_api_key': os.getenv("GOOGLE_API_KEY"),
+            'organization_depth': int(os.getenv("ORGANIZATION_DEPTH", "99"))  # Add depth limit
         }
     
     def _load_organization_rules(self) -> Dict[str, Any]:
@@ -312,7 +313,7 @@ class UltimateFileOrganizer:
         
         return instructions
     
-    async def analyze_directory_contents(self, target_path: str) -> Dict[str, Any]:
+    def analyze_directory_contents(self, target_path: str) -> Dict[str, Any]:
         """Perform comprehensive analysis of directory contents."""
         print("🔍 Analyzing directory contents...")
         
@@ -328,22 +329,7 @@ class UltimateFileOrganizer:
         }
         
         # Recursively analyze all files
-        for file_path in path_obj.rglob('*'):
-            if file_path.is_file():
-                file_analysis = self.analyze_file_content(file_path)
-                analysis['file_details'].append(file_analysis)
-                analysis['total_files'] += 1
-                analysis['total_size'] += file_analysis['size']
-                
-                if file_analysis['suggested_category']:
-                    analysis['categories_found'].add(file_analysis['suggested_category'])
-                
-                # Track duplicates by hash
-                if file_analysis['file_hash']:
-                    if file_analysis['file_hash'] in analysis['hash_map']:
-                        analysis['duplicate_count'] += 1
-                    else:
-                        analysis['hash_map'][file_analysis['file_hash']] = str(file_path)
+        self._analyze_directory_recursive(path_obj, analysis, 0)
         
         analysis['categories_found'] = list(analysis['categories_found'])
         
@@ -354,6 +340,27 @@ class UltimateFileOrganizer:
         
         print(f"📊 Analysis complete: {analysis['total_files']} files, {len(analysis['categories_found'])} categories")
         return analysis
+
+    def _analyze_directory_recursive(self, path: Path, analysis: Dict, depth: int):
+        """Recursively analyze directory contents up to a specified depth."""
+        if depth > self.config['organization_depth']:
+            return
+
+        for entry in path.iterdir():
+            if entry.is_file():
+                file_analysis = self.analyze_file_content(entry)
+                analysis['file_details'].append(file_analysis)
+                analysis['total_files'] += 1
+                analysis['total_size'] += file_analysis['size']
+                if file_analysis['suggested_category']:
+                    analysis['categories_found'].add(file_analysis['suggested_category'])
+                if file_analysis['file_hash']:
+                    if file_analysis['file_hash'] in analysis['hash_map']:
+                        analysis['duplicate_count'] += 1
+                    else:
+                        analysis['hash_map'][file_analysis['file_hash']] = str(entry)
+            elif entry.is_dir():
+                self._analyze_directory_recursive(entry, analysis, depth + 1)
     
     async def run_ultimate_organization(self, target_path: Optional[str] = None) -> None:
         """Run the ultimate file organization process."""
@@ -372,7 +379,7 @@ class UltimateFileOrganizer:
         backup_path = self.create_backup(target_path)
         
         # Analyze directory contents
-        file_analysis = await self.analyze_directory_contents(target_path)
+        file_analysis = self.analyze_directory_contents(target_path)
         
         # Initialize Gemini model
         try:
@@ -454,6 +461,17 @@ class UltimateFileOrganizer:
                     
                     if backup_path:
                         print(f"\n💾 Backup created at: {backup_path}")
+                        review_input = input("\n🧐 Please review the changes. Are you satisfied with the organization? (yes/no): ").strip().lower()
+                        if review_input == 'yes':
+                            try:
+                                print(f"🗑️ Deleting backup directory: {backup_path}")
+                                shutil.rmtree(backup_path)
+                                print("✅ Backup deleted successfully.")
+                                self.backup_dir = None  # Clear backup path after deletion
+                            except Exception as e:
+                                print(f"❌ Error deleting backup directory: {e}")
+                        else:
+                            print(f"👍 Backup retained at: {backup_path}")
                     
                     # Save organization session log
                     self._save_organization_log(target_path, file_analysis, plan_response.content)
